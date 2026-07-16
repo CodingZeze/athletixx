@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+
+// Mock storage
+const mockFavoritePlayers = new Map<string, any[]>();
 
 export async function DELETE(
   req: NextRequest,
@@ -13,22 +15,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const favorite = await prisma.favoritePlayer.findUnique({
-      where: { id: params.id },
-    });
+    const userId = (session.user as any).id;
+    const userPlayers = mockFavoritePlayers.get(userId) || [];
+    const favorite = userPlayers.find((p) => p.id === params.id);
 
     if (!favorite) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Check if user owns this favorite
-    if (favorite.userId !== (session.user as any).id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    await prisma.favoritePlayer.delete({
-      where: { id: params.id },
-    });
+    const filtered = userPlayers.filter((p) => p.id !== params.id);
+    mockFavoritePlayers.set(userId, filtered);
 
     return NextResponse.json({ success: true });
   } catch (error) {

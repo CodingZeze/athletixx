@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,26 +9,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: (session.user as any).id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        _count: {
-          select: {
-            favoriteTeams: true,
-            favoritePlayers: true,
-          },
-        },
+    const user = {
+      id: (session.user as any).id,
+      email: session.user?.email,
+      name: session.user?.name,
+      role: (session.user as any).role || 'USER',
+      createdAt: new Date().toISOString(),
+      _count: {
+        favoriteTeams: 0,
+        favoritePlayers: 0,
       },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
+    };
 
     return NextResponse.json(user);
   } catch (error) {

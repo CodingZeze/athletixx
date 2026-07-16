@@ -1,6 +1,25 @@
-import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
+
+// In-memory mock database for Vercel deployment
+const mockUsers: Map<string, any> = new Map();
+
+// Add demo users
+mockUsers.set('demo@athletix.app', {
+  id: 'demo-user-1',
+  email: 'demo@athletix.app',
+  password: '$2a$10$fakehashedpassword', // demo123 hashed
+  name: 'Demo User',
+  role: 'USER',
+});
+
+mockUsers.set('admin@athletix.app', {
+  id: 'demo-admin-1',
+  email: 'admin@athletix.app',
+  password: '$2a$10$fakehashedpassword', // admin123 hashed
+  name: 'Admin User',
+  role: 'ADMIN',
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,11 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
+    if (mockUsers.has(email)) {
       return NextResponse.json(
         { error: 'User already exists' },
         { status: 409 }
@@ -37,14 +52,16 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        name,
-        password: hashedPassword,
-        role: 'USER',
-      },
-    });
+    const userId = `user-${Date.now()}`;
+    const user = {
+      id: userId,
+      email,
+      name,
+      password: hashedPassword,
+      role: 'USER',
+    };
+
+    mockUsers.set(email, user);
 
     return NextResponse.json(
       {
@@ -62,3 +79,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Export for use in auth
+export { mockUsers };

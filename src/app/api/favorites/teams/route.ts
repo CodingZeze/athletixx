@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+
+// Mock favorite teams storage (in-memory for Vercel)
+const mockFavoriteTeams = new Map<string, any[]>();
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,10 +12,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const teams = await prisma.favoriteTeam.findMany({
-      where: { userId: (session.user as any).id },
-      orderBy: { createdAt: 'desc' },
-    });
+    const userId = (session.user as any).id;
+    const teams = mockFavoriteTeams.get(userId) || [];
 
     return NextResponse.json(teams);
   } catch (error) {
@@ -41,31 +41,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if already favorited
-    const existing = await prisma.favoriteTeam.findUnique({
-      where: {
-        userId_teamId: {
-          userId: (session.user as any).id,
-          teamId,
-        },
-      },
-    });
+    const userId = (session.user as any).id;
+    const userTeams = mockFavoriteTeams.get(userId) || [];
 
-    if (existing) {
+    // Check if already favorited
+    if (userTeams.some((t) => t.teamId === teamId)) {
       return NextResponse.json(
         { error: 'Already favorited' },
         { status: 409 }
       );
     }
 
-    const favorite = await prisma.favoriteTeam.create({
-      data: {
-        userId: (session.user as any).id,
-        teamId,
-        teamName,
-        league: league || 'Unknown',
-      },
-    });
+    const favorite = {
+      id: `team-${Date.now()}`,
+      userId,
+      teamId,
+      teamName,
+      league: league || 'Unknown',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    userTeams.push(favorite);
+    mockFavoriteTeams.set(userId, userTeams);
 
     return NextResponse.json(favorite, { status: 201 });
   } catch (error) {
